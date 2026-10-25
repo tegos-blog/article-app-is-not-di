@@ -40,6 +40,8 @@ final readonly class CartIndexAction implements Actionable
 
 The container creates the dependency in both cases. What changes is **who knows about whom**. In the first one, `User` knows about the container and hides its dependency inside a method body. In the second one, the class has no idea where `CartItemDtoFactory` comes from, and the constructor tells you everything it needs.
 
+That's the whole cost of Service Locator. The class signature lies about its dependencies, a missing binding fails at runtime instead of at construction, and a constructor that grows too long is a useful warning that `app()` simply hides.
+
 The Laravel docs lean the same way. They show `app()` and `App::make()` for code that has no `$app` variable at hand, and then, about constructor type-hints:
 
 > In practice, this is how most of your objects should be resolved by the container.
@@ -84,7 +86,7 @@ $warehouseService = App::make(WarehouseService::class);
 
 Four dependencies, and the constructor mentioned none of them.
 
-A good part of the drop was not refactoring at all. 10 calls went away only because the whole file was deleted. And `User::getCart()` from the example above was already dead: the cart actions had already switched to an injected cart repository, and only other dead code still called the model method. Let's be honest: most of these calls lived in old code, and old code gets deleted.
+A good part of the drop was not refactoring at all. Of the 18, 10 went away only because the whole file was deleted. `User::getCart()` from the example above was dead too. The cart actions had switched to an injected cart repository long before, and only other dead code still called the model method. It went out with a "Cleanup" commit, together with a few similar calls. The last one needed a real refactoring. Let's be honest: most of these calls lived in old code, and old code gets deleted.
 
 ## The Last One: A Model That Built Its Own Primary Key
 
@@ -107,9 +109,9 @@ public function newUniqueId(): string
 }
 ```
 
-Eloquent creates models with `new`, not through the container, so you can't inject anything into a model constructor. Inside a model, you can only ask for a service: `app()` or a facade. So **if a model needs `app()`, the logic is probably in the wrong place**.
+Eloquent creates models with `new`, not through the container, so you can't inject anything into a model constructor. And `newUniqueId()` is a hook Eloquent calls itself, with no arguments. Inside a hook like that, you can only ask for a service: `app()` or a facade. So **if a model needs `app()`, the logic is probably in the wrong place**.
 
-It also made testing awkward. The only way to check this code was to create an order and look at the id it got. When I wanted to test the edge cases (a locked id, too many attempts), I had to pull the logic out first:
+To be fair, `app()` itself wasn't what blocked testing. In Laravel you can swap a binding with `$this->instance()` or `$this->mock()`. The real problem was the order-specific logic (prefix, lock, year scope) living in a model hook. When I wanted to test the edge cases (a locked id, too many attempts), I had to pull that logic out first:
 
 ```php
 // app/Actions/Order/OrderCreateAction.php, today
@@ -135,7 +137,9 @@ final readonly class OrderCreateAction implements Actionable
 }
 ```
 
-And now the generator gets its own unit test, no order creation needed:
+The trade-off: the model has `$incrementing = false`, so an `Order::create()` that skips the action gets no id from Laravel. In our case both order create actions inject the generator, and the factory sets its own id.
+
+And now the generator gets its own test, no order creation needed:
 
 ```php
 public function test_order_pk_skips_locked_id_and_tries_next(): void
@@ -153,7 +157,7 @@ public function test_order_pk_skips_locked_id_and_tries_next(): void
 }
 ```
 
-Yes, the generator still uses the `Cache` and `Date` facades inside. That's the scope note from above: facades stayed, the hidden `app()` lookup of our own class went.
+Yes, the generator still uses the `Cache` and `Date` facades, `config()`, and `Order::query()` inside. So the test still boots the app and touches the database. That's the scope note from above: facades stayed, the hidden `app()` lookup of our own class went.
 
 The commit that removed the last `app()` call was titled "Test: Add failing unit tests for OrderPrimaryKeyGenerator". A test pushed it out.
 
@@ -161,13 +165,13 @@ The commit that removed the last `app()` call was titled "Test: Add failing unit
 
 There was no PHPStan rule, no architecture test, no blocking review.
 
-Over the years I mentioned it to a colleague in code review a few times. More like a note than a rule. At some point I even admitted I use `app()` myself sometimes and told him to do it his way. His last new `app()` call landed that same day. Mine kept coming for a while longer. By `git blame`, I added more of these calls than he did. So this isn't a story about fixing someone else's code. We both wrote these calls and we both deleted them.
+Over the years I mentioned it to a colleague in code review a few times. More like a note than a rule. At some point I even admitted I use `app()` myself sometimes and told him to do it his way. My own new calls kept coming for months after that. By `git blame`, I added more of these calls than he did. So this isn't a story about fixing someone else's code. We both wrote these calls and we both deleted them.
 
-A written rule did appear eventually. "Avoid `app()`, prefer constructor injection" went into our project guidelines in April 2026, when exactly one call was left. It recorded what had already happened.
+A written rule did appear eventually. "Avoid `app()`, prefer constructor injection" went into our project guidelines in April 2026, when exactly one call was left. Two weeks later, that one was gone too.
 
 ## Where You Don't Need app() (And Where It's Fine)
 
-Before reaching for `app()`, check if Laravel already calls your method through the container. It does in more places than most people use:
+Before reaching for `app()`, check if Laravel already calls your method through the container. It does in more places than most people think:
 
 - `handle()` in commands and queued jobs
 - `rules()` and `authorize()` in form requests (documented)
@@ -220,7 +224,7 @@ Not a rule for the team, just what the history taught me:
 
 - `app(Foo::class)` is resolved by the container, but it's still the Service Locator pattern. DI means the dependency arrives through the signature.
 - In one real project, it went from a peak of 18 calls to 0 while the code roughly tripled. Many calls simply died with old code.
-- The last one was in a model, and a unit test pushed it out. The written rule came after.
+- The last one was in a model hook, and writing a test for it pushed it out. The written rule landed when only that one was left.
 - Form request `after()` accepts method injection too (undocumented, verified on Laravel 12.43.1).
 
 ---

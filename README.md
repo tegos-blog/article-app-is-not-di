@@ -1,10 +1,10 @@
-# app() Is Not Dependency Injection: 18 Calls Gone Before the Rule
+# app() Is Not Dependency Injection: 18 Calls Down to Zero
 
-![app() Is Not Dependency Injection: 18 Calls Gone Before the Rule](assets/poster.jpg)
+![app() Is Not Dependency Injection: 18 Calls Down to Zero](assets/poster.jpg)
 
 I keep hearing "we use DI everywhere" from Laravel devs whose code is full of `app(SomeService::class)`. That's Service Locator, and I've said so in code reviews for years. Still, the git history of the project I work on had 18 of these calls at the peak.
 
-Knowing it's an anti-pattern and not writing it are two different things. This is how those 18 calls went to zero, with no linter, and the written rule came only at the end.
+Knowing it's an anti-pattern and not writing it are two different things. This is how those 18 calls went to zero, with no linter, and the written rule came when only one was left.
 
 ## What's Inside
 
@@ -16,4 +16,4 @@ Knowing it's an anti-pattern and not writing it are two different things. This i
 
 ## 📎 Read Full
 
-[app() Is Not Dependency Injection: 18 Calls Gone Before the Rule](https://dev.to/tegos/PLACEHOLDER)
+[app() Is Not Dependency Injection: 18 Calls Down to Zero](https://dev.to/tegos/PLACEHOLDER)
