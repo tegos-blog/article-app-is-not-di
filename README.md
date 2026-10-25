@@ -16,4 +16,4 @@ Knowing it's an anti-pattern and not writing it are two different things. This i
 
 ## 📎 Read Full
 
-[app() Is Not Dependency Injection: 18 Calls Down to Zero](https://dev.to/tegos/PLACEHOLDER)
+[app() Is Not Dependency Injection: 18 Calls Down to Zero](https://dev.to/tegos/app-is-not-dependency-injection-18-calls-down-to-zero-k90)
