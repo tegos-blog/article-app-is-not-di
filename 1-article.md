@@ -38,6 +38,8 @@ final readonly class CartIndexAction implements Actionable
 }
 ```
 
+Two quick definitions, so we argue about the same thing. With dependency injection, a class gets its dependencies from outside, through the constructor or a method parameter, and doesn't care who built them. With Service Locator, the class asks a shared registry for them itself, in the middle of its own code. In Laravel, that registry is the container, and `app()` is the call.
+
 The container creates the dependency in both cases. What changes is **who knows about whom**. In the first one, `User` knows about the container and hides its dependency inside a method body. In the second one, the class has no idea where `CartItemDtoFactory` comes from, and the constructor tells you everything it needs.
 
 That's the whole cost of Service Locator. The class signature lies about its dependencies, a missing binding fails at runtime instead of at construction, and a constructor that grows too long is a useful warning that `app()` simply hides.
